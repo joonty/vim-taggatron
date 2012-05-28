@@ -25,7 +25,7 @@ let g:tagcommands = {
 \        "tagfile" : ".php.tags",   " Location of the tag file
 \        "args" : "-R",   " Arguments to pass to the command (-f and --languages are added automatically)
 \        "cmd" : "ctags-exuberant",   " Command to execute
-\        "filesappend" : "**",   " This is appended to the current working directory, and used as the files argument
+\        "filesappend" : "**"   " This is appended to the current working directory, and used as the files argument
 \    }
 \}
 ```
@@ -58,7 +58,7 @@ let g:tagcommands = {
 \    "php" : {
 \        "tagfile" : "sub/directory/php.tags",
 \        "args" : "-R",
-\        "fileappend" : "sub/directory/**"
+\        "filesappend" : "sub/directory/**"
 \    }
 \}
 ```
@@ -70,7 +70,7 @@ let g:tagcommands = {
 \    "php" : {
 \        "tagfile" : "/path/to/directory/php.tags",
 \        "args" : "-R",
-\        "fileappend" : "/path/to/directory/**"
+\        "files" : "/path/to/directory/**"
 \    }
 \}
 ```
