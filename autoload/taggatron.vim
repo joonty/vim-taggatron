@@ -10,8 +10,10 @@ let s:taggatron_cmd_entry = {"cmd":"ctags-exuberant","args":"",'filesappend':'**
 function! taggatron#CreateTags(cmdset,forceCreate)
     call taggatron#debug("Creating tags for file type ".&filetype)
     call taggatron#debug(a:cmdset)
-    let l:cset = s:taggatron_cmd_entry
+    call taggatron#debug(s:taggatron_cmd_entry)
+    let l:cset = {}
     let l:eset = a:cmdset
+    call extend(l:cset,s:taggatron_cmd_entry)
     call extend(l:cset,l:eset)
     if !has_key(l:cset,'tagfile') 
         call taggatron#error("Missing tag file destination from tag commands for file type ".&filetype)

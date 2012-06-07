@@ -8,11 +8,12 @@ if !exists("g:taggatron_verbose")
     let g:taggatron_verbose = 0
 endif
 
-au BufWritePost * call taggatron#CheckCommandList(0)
-command TagUpdate call taggatron#CheckCommandList(1)
+au! BufWritePost * call taggatron#CheckCommandList(0)
+command! TagUpdate call taggatron#CheckCommandList(1)
 
 function! taggatron#CheckCommandList(forceCreate)
     let l:cwd = getcwd()
+    call taggatron#debug("Current directory: ".l:cwd)
     if expand("%:p:h") =~ l:cwd . ".*"
         call taggatron#debug("Checking for tag command for this file type")
         let l:cmdset = get(g:tagcommands,&filetype)
