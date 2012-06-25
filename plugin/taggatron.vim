@@ -10,6 +10,13 @@ endif
 
 au! BufWritePost * call taggatron#CheckCommandList(0)
 command! TagUpdate call taggatron#CheckCommandList(1)
+command! -nargs=1 SetTags call taggatron#SetTags(<f-args>)
+
+function! taggatron#SetTags(tags)
+    call taggatron#debug("Setting tag files: ".a:tags)
+    exec "set tags=".a:tags
+    let g:tagdefaults = a:tags
+endfunction
 
 function! taggatron#CheckCommandList(forceCreate)
     let l:cwd = getcwd()
