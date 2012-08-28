@@ -8,7 +8,7 @@ if !exists("g:taggatron_verbose")
     let g:taggatron_verbose = 0
 endif
 
-au! BufWritePost * call taggatron#CheckCommandList(0)
+autocmd BufWritePost * call taggatron#CheckCommandList(0)
 command! TagUpdate call taggatron#CheckCommandList(1)
 command! -nargs=1 SetTags call taggatron#SetTags(<f-args>)
 
