@@ -7,6 +7,9 @@ endif
 if !exists("g:taggatron_verbose")
     let g:taggatron_verbose = 0
 endif
+if !exists("g:taggatron_enabled")
+    let g:taggatron_enabled = 1
+endif
 
 autocmd BufWritePost * call taggatron#CheckCommandList(0)
 command! TagUpdate call taggatron#CheckCommandList(1)
@@ -19,6 +22,11 @@ function! taggatron#SetTags(tags)
 endfunction
 
 function! taggatron#CheckCommandList(forceCreate)
+    if g:taggatron_enabled != 1
+        call taggatron#debug("Tag file generation disabled (taggatron_enabled: " . g:taggatron_enabled . ")")
+        return
+    endif
+
     let l:cwd = getcwd()
     call taggatron#debug("Current directory: ".l:cwd)
     if expand("%:p:h") =~ l:cwd . ".*"
@@ -32,5 +40,4 @@ function! taggatron#CheckCommandList(forceCreate)
     else
         call taggatron#debug("Not creating tags: file is not in current directory")
     endif
-
 endfunction
