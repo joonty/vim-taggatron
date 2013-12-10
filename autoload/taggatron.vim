@@ -40,9 +40,7 @@ function! taggatron#CreateTags(cmdset,forceCreate)
     endif
 
     let l:tagfile = taggatron#makeAbsoluteFilePath(l:cset['tagfile'],l:cwd)
-
-    exec "set tags=".g:tagdefaults.",".l:tagfile
-
+    call taggatron#SetTags(l:tagfile)
 endfunction
 
 function! taggatron#makeAbsoluteFilePath(file,cwd)
