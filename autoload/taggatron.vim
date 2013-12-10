@@ -15,12 +15,12 @@ function! taggatron#CreateTags(cmdset,forceCreate)
     let l:eset = a:cmdset
     call extend(l:cset,s:taggatron_cmd_entry)
     call extend(l:cset,l:eset)
-    if !has_key(l:cset,'tagfile') 
+    if !has_key(l:cset,'tagfile')
         call taggatron#error("Missing tag file destination from tag commands for file type ".&filetype)
         return
     endif
-    let l:cwd = getcwd()
-    if !has_key(l:cset,'files') 
+    let l:cwd = fnamemodify(getcwd(), ':p')
+    if !has_key(l:cset,'files')
         let l:cset['files'] = l:cwd
         if has_key(l:cset,'filesappend')
             let l:cset['files'] = l:cset['files'].l:cset['filesappend']
@@ -39,32 +39,8 @@ function! taggatron#CreateTags(cmdset,forceCreate)
         call taggatron#UpdateTags(l:cset['cmd'],l:cwd,l:cset['tagfile'])
     endif
 
-    let l:tagfile = taggatron#makeAbsoluteFilePath(l:cset['tagfile'],l:cwd)
+    let l:tagfile = fnamemodify(l:cwd.l:cset['tagfile'], ':p')
     call taggatron#SetTags(l:tagfile)
-endfunction
-
-function! taggatron#makeAbsoluteFilePath(file,cwd)
-    if has("unix")
-        if a:file =~ "^/.*"
-            return a:file
-        else
-            if a:cwd =~ "^.*/$"
-                return a:cwd.a:file
-            else
-                return a:cwd."/".a:file
-            endif
-        endif
-    else
-        if a:file =~ "^[a-zA-Z]:.*"
-            return a:file
-        else
-            if a:cwd =~ "^.*\\$"
-                return a:cwd.a:file
-            else
-                return a:cwd."\\".a:file
-            endif
-        endif
-    endif
 endfunction
 
 function! taggatron#error(str)
