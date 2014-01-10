@@ -63,7 +63,7 @@ function! taggatron#error(str)
 endfunction
 
 function! taggatron#debug(str)
-    if g:taggatron_verbose == 1
+    if b:taggatron_verbose == 1
         echo a:str
     endif
 endfunction

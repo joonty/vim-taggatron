@@ -1,25 +1,12 @@
-if !exists("g:tagcommands")
-    let g:tagcommands = {}
-endif
-if !exists("g:tagdefaults")
-    let g:tagdefaults = ""
-endif
-if !exists("g:taggatron_verbose")
-    let g:taggatron_verbose = 0
-endif
-if !exists("g:taggatron_enabled")
-    let g:taggatron_enabled = 1
-endif
+function! taggatron#GetOption(option, default)
+    for l:prefix in ['b', 'g']
+        if exists(l:prefix . ':'. a:option)
+            return eval(l:prefix . ':'. a:option)
+        endif
+    endfor
 
-" Include all default tags
-if len(g:tagdefaults) > 0
-    call taggatron#debug("Adding default tags: ".g:tagdefaults)
-    exec "setlocal tags+=".g:tagdefaults
-endif
-
-autocmd BufWritePost * call taggatron#CheckCommandList(0)
-command! TagUpdate call taggatron#CheckCommandList(1)
-command! -nargs=1 SetTags call taggatron#SetTags(<f-args>)
+    return a:default
+endfunction
 
 function! taggatron#SetTags(files)
     " Define local support variables
@@ -63,8 +50,8 @@ function! taggatron#SetTags(files)
 endfunction
 
 function! taggatron#CheckCommandList(forceCreate)
-    if g:taggatron_enabled != 1
-        call taggatron#debug("Tag file generation disabled (taggatron_enabled: " . g:taggatron_enabled . ")")
+    if b:taggatron_enabled != 1
+        call taggatron#debug("Tag file generation disabled (taggatron_enabled: " . b:taggatron_enabled . ")")
         return
     endif
 
@@ -72,7 +59,7 @@ function! taggatron#CheckCommandList(forceCreate)
     call taggatron#debug("Current directory: ".l:cwd)
     if expand("%:p:h") =~ l:cwd . ".*"
         call taggatron#debug("Checking for tag command for this file type")
-        let l:cmdset = get(g:tagcommands,&filetype)
+        let l:cmdset = get(b:tagcommands,&filetype)
         if l:cmdset is 0
             call taggatron#debug("No tag command for filetype " . &filetype)
         else
@@ -82,3 +69,21 @@ function! taggatron#CheckCommandList(forceCreate)
         call taggatron#debug("Not creating tags: file is not in current directory")
     endif
 endfunction
+
+
+" Initialise taggatron options
+let b:tagcommands = taggatron#GetOption('tagcommands', {})
+let b:tagdefaults = taggatron#GetOption('tagdefaults', '')
+let b:taggatron_verbose = taggatron#GetOption('taggatron_verbose', 0)
+let b:taggatron_enabled = taggatron#GetOption('taggatron_enabled', 1)
+
+" Include all default tags
+if len(b:tagdefaults) > 0
+    call taggatron#debug("Adding default tags: ".b:tagdefaults)
+    exec "setlocal tags+=".b:tagdefaults
+endif
+
+" Initialise taggatron commands
+autocmd BufWritePost * call taggatron#CheckCommandList(0)
+command! TagUpdate call taggatron#CheckCommandList(1)
+command! -nargs=1 SetTags call taggatron#SetTags(<f-args>)
