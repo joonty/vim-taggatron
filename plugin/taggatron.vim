@@ -1,13 +1,3 @@
-function! taggatron#GetOption(option, default)
-    for l:prefix in ['b', 'g']
-        if exists(l:prefix . ':'. a:option)
-            return eval(l:prefix . ':'. a:option)
-        endif
-    endfor
-
-    return a:default
-endfunction
-
 function! taggatron#SetTags(files)
     " Define local support variables
     let l:files = type(a:files) == 1 ? [a:files] : a:files
@@ -49,41 +39,71 @@ function! taggatron#SetTags(files)
     endfor
 endfunction
 
-function! taggatron#CheckCommandList(forceCreate)
-    if b:taggatron_enabled != 1
-        call taggatron#debug("Tag file generation disabled (taggatron_enabled: " . b:taggatron_enabled . ")")
-        return
+""
+" Determine an option's value based on user configuration or a default value. 
+"
+" A user can configure an option by defining it as a buffer variable or as 
+" a global (buffer vars override globals). Default value can be provided by 
+" defining a script variable for the whole file or a function local variable 
+" (local vars override script vars). When all else fails, a fallback default 
+" value can by supplied as a second argument to the function.
+"
+function! taggatron#get(option, ...)
+    for l:scope in ['b', 'g', 'l', 's']
+        if exists(l:scope . ':'. a:option)
+            return eval(l:scope . ':'. a:option)
+        endif
+    endfor
+
+    if a:0 > 0
+        return a:1
     endif
 
-    let l:cwd = getcwd()
-    call taggatron#debug("Current directory: ".l:cwd)
-    if expand("%:p:h") =~ l:cwd . ".*"
-        call taggatron#debug("Checking for tag command for this file type")
-        let l:cmdset = get(b:tagcommands,&filetype)
-        if l:cmdset is 0
-            call taggatron#debug("No tag command for filetype " . &filetype)
-        else
-            call taggatron#CreateTags(l:cmdset,a:forceCreate)
-        endif
-    else
-        call taggatron#debug("Not creating tags: file is not in current directory")
+    call taggatron#error('Invalid or undefined option: ' . a:option)
+endfunction
+
+""
+" Echo supplied messages to the user, pre-formatting it as an Error. All 
+" messages are saved into message-history buffer and can be reviewed with 
+" :messages command.
+"
+function! taggatron#error(str)
+    echohl Error | echomsg a:str | echohl None
+endfunction
+
+""
+" Echo supplied messages to the user but only of taggatron verbose mode has 
+" been enabled. All messages are saved into message-history buffer and can be 
+" reviewed with :messages command.
+"
+function! taggatron#debug(str)
+    if taggatron#get('taggatron_verbose') == 1
+        echomsg a:str
     endif
 endfunction
 
+" -- "
 
-" Initialise taggatron options
-let b:tagcommands = taggatron#GetOption('tagcommands', {})
-let b:tagdefaults = taggatron#GetOption('tagdefaults', '')
-let b:taggatron_verbose = taggatron#GetOption('taggatron_verbose', 0)
-let b:taggatron_enabled = taggatron#GetOption('taggatron_enabled', 1)
-
-" Include all default tags
-if len(b:tagdefaults) > 0
-    call taggatron#debug("Adding default tags: ".b:tagdefaults)
-    exec "setlocal tags+=".b:tagdefaults
+" Include global default tags
+if exists('g:tagdefaults') && len(g:tagdefaults) > 0
+    call taggatron#debug("Adding global default tags: ".g:tagdefaults)
+    call taggatron#SetTags(g:tagdefaults)
 endif
 
+" Initialise taggatron auto-commands
+augroup Templates
+    autocmd!
+
+    " Include buffer default tags
+    autocmd BufNew,BufRead * if exists('b:tagdefaults') && len(b:tagdefaults) > 0 |
+                \ call taggatron#debug("Adding buffer default tags: ".b:tagdefaults)
+                \ call taggatron#SetTags(g:tagdefaults)
+                \ endif
+
+    " Create tags for the local file
+    autocmd BufWritePost * call taggatron#CheckCommandList(0)
+augroup END
+
 " Initialise taggatron commands
-autocmd BufWritePost * call taggatron#CheckCommandList(0)
 command! TagUpdate call taggatron#CheckCommandList(1)
 command! -nargs=1 SetTags call taggatron#SetTags(<f-args>)
