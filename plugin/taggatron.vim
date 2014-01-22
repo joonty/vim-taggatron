@@ -1,8 +1,28 @@
+" Initialise script default values
+let s:taggatron_verbose = 0
+let s:tagdefaults = ''
+
+" Function Declarations
+" =====================
+"
+" This section is used minimize memory foot print of the idle plugin and to 
+" speed up loading times. All functions required to initialise the plugin are 
+" declared below, delaying the load of `autoload/taggatron.vim` file until the 
+" first time the plugin is used.
+
+""
+" Add a file to the list of local tags
+"
+" This function is used to add user supplied file to the list of local tags. 
+" Before being added, the filename is converted to the absolute path to file 
+" and is only added if that file is not already on the list.
+"
+" @param list|string files A file or a list of files to be added
+"
 function! taggatron#SetTags(files)
     " Define local support variables
     let l:files = type(a:files) == 1 ? [a:files] : a:files
     let l:tagfiles = []
-    let l:cwd = fnamemodify(getcwd(), ':p')
 
     " Fail if l:files is not a list
     if type(l:files) != 3
@@ -17,14 +37,14 @@ function! taggatron#SetTags(files)
 
     " Create a list of all tag files currently loaded (absolute path)
     for l:tagfile in tagfiles()
-        call add(l:tagfiles, fnamemodify(l:cwd.l:tagfile, ':p'))
+        call add(l:tagfiles, fnamemodify(l:tagfile, ':p'))
     endfor
 
     " Process all tag files one by one
     for l:file in l:files
         " Skip non-existent and unreadable file
         if !filereadable(l:file)
-            call taggatron#debug("Skipping non-existent or unreadable tag file: ".l:file)
+            call taggatron#debug("Skipping unreadable tag file: " . l:file)
             continue
         endif
 
@@ -33,20 +53,24 @@ function! taggatron#SetTags(files)
 
         " Only add current file to tags if it hasn't been already found
         if index(l:tagfiles, l:file) == -1
-            call taggatron#debug("Adding tag file: ".l:file)
-            exec "setlocal tags+=".l:file
+            call taggatron#debug("Adding tag file:" . l:file)
+            exec "setlocal tags+=" . l:file
         endif
     endfor
 endfunction
 
 ""
-" Determine an option's value based on user configuration or a default value. 
+" Fetch a scoped value of an option
 "
-" A user can configure an option by defining it as a buffer variable or as 
-" a global (buffer vars override globals). Default value can be provided by 
-" defining a script variable for the whole file or a function local variable 
-" (local vars override script vars). When all else fails, a fallback default 
-" value can by supplied as a second argument to the function.
+" Determine a value of an option based on user configuration or pre-configured 
+" defaults. A user can configure an option by defining it as a buffer variable 
+" or as a global (buffer vars override globals). Default value can be provided 
+" by defining a script variable for the whole file or a function local (local 
+" vars override script vars). When all else fails, falls back the supplied 
+" default value,  if one is supplied.
+"
+" @param string option Scope-less name of the option
+" @param mixed a:1 An option default value for the option
 "
 function! taggatron#get(option, ...)
     for l:scope in ['b', 'g', 'l', 's']
@@ -63,46 +87,40 @@ function! taggatron#get(option, ...)
 endfunction
 
 ""
-" Echo supplied messages to the user, pre-formatting it as an Error. All 
-" messages are saved into message-history buffer and can be reviewed with 
-" :messages command.
+" Show user an error message
 "
-function! taggatron#error(str)
-    echohl Error | echomsg a:str | echohl None
+" Pre-format supplied message as an Error and display it to the user. All 
+" messages are saved to message-history and are accessible via `:messages`.
+"
+" @param string message A message to be displayed to the user
+"
+function! taggatron#error(message)
+    echohl Error | echomsg a:message | echohl None
 endfunction
 
 ""
-" Echo supplied messages to the user but only of taggatron verbose mode has 
-" been enabled. All messages are saved into message-history buffer and can be 
-" reviewed with :messages command.
+" Show user a debug message
 "
-function! taggatron#debug(str)
-    if taggatron#get('taggatron_verbose') == 1
-        echomsg a:str
+" Echo supplied message to the user if verbose mode is enabled.  All messages 
+" are saved to message-history and can be reviewed with :messages command.
+"
+" @param string message A message to be displayed to the user
+"
+function! taggatron#debug(message)
+    " Do nothing if verbose mode is disabled
+    if taggatron#get('taggatron_verbose') == 0
+        return
     endif
+
+    echomsg a:message
 endfunction
 
-" -- "
-
-" Include global default tags
-if exists('g:tagdefaults') && len(g:tagdefaults) > 0
-    call taggatron#debug("Adding global default tags: ".g:tagdefaults)
-    call taggatron#SetTags(g:tagdefaults)
-endif
+" Executable code
+" ===============
 
 " Initialise taggatron auto-commands
-augroup Templates
-    autocmd!
-
-    " Include buffer default tags
-    autocmd BufNew,BufRead * if exists('b:tagdefaults') && len(b:tagdefaults) > 0 |
-                \ call taggatron#debug("Adding buffer default tags: ".b:tagdefaults)
-                \ call taggatron#SetTags(g:tagdefaults)
-                \ endif
-
-    " Create tags for the local file
-    autocmd BufWritePost * call taggatron#CheckCommandList(0)
-augroup END
+autocmd! BufNew,BufRead * call taggatron#SetTags(taggatron#get('tagdefaults', []))
+autocmd! BufWritePost * call taggatron#CheckCommandList(0)
 
 " Initialise taggatron commands
 command! TagUpdate call taggatron#CheckCommandList(1)
