@@ -2,10 +2,54 @@
 if exists("g:loaded_taggatron") || &cp
     finish
 endif
-
 let g:loaded_taggatron= 1
 
-let s:taggatron_cmd_entry = {"cmd":"ctags-exuberant","args":"",'filesappend':'**'}
+" Initialise script default values
+let s:tagcommands = {}
+let s:tagdefaults = ''
+let s:taggatron_verbose = 0
+let s:taggatron_enabled = 1
+let s:taggatron_cmd_entry = {
+            \ "cmd": "ctags-exuberant",
+            \ "args": "",
+            \ "filesappend": "**"
+            \ }
+
+" TODO: CheckCommandList no longer describes the purpose of the function.  
+" Init - might be a better name.
+function! taggatron#CheckCommandList(forceCreate)
+    " Initialise local variables
+    let l:taggatron_enabled = taggatron#get('taggatron_enabled')
+
+    " Ensure taggatron is enabled
+    if l:taggatron_enabled != 1
+        call taggatron#debug("Tag file generation disabled (taggatron_enabled: " . l:taggatron_enabled . ")")
+        return
+    endif
+
+    " Identify current working directory
+    let l:cwd = getcwd()
+    call taggatron#debug("Current directory: ".l:cwd)
+
+    " Only process files with in current working directory
+    if expand("%:p:h") =~ l:cwd . ".*"
+        call taggatron#debug("Checking for tag command for this file type")
+        let l:cmdset = get(b:tagcommands,&filetype)
+
+        " Log a message if tag command is missing
+        if l:cmdset is 0
+            call taggatron#debug("No tag command for filetype " . &filetype)
+
+        " Create tags since tag command does exists
+        else
+            call taggatron#CreateTags(l:cmdset,a:forceCreate)
+        endif
+
+    " Log a message if current file is outside current working directory
+    else
+        call taggatron#debug("Not creating tags: file is not in current directory")
+    endif
+endfunction
 
 function! taggatron#CreateTags(cmdset,forceCreate)
     call taggatron#debug("Creating tags for file type ".&filetype)
@@ -56,16 +100,6 @@ function! taggatron#CreateTags(cmdset,forceCreate)
     " Ensure that generated tags are picked up by the editor
     let l:tagfile = fnamemodify(l:cwd.l:cset['tagfile'], ':p')
     call taggatron#SetTags(l:tagfile)
-endfunction
-
-function! taggatron#error(str)
-    echohl Error | echo a:str | echohl None
-endfunction
-
-function! taggatron#debug(str)
-    if g:taggatron_verbose == 1
-        echo a:str
-    endif
 endfunction
 
 """"""""""""""""""
