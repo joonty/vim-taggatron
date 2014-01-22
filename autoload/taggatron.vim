@@ -5,101 +5,115 @@ endif
 let g:loaded_taggatron= 1
 
 " Initialise script default values
-let s:tagcommands = {}
-let s:tagdefaults = ''
-let s:taggatron_verbose = 0
 let s:taggatron_enabled = 1
-let s:taggatron_cmd_entry = {
+let s:tagcommands = {}
+let s:tagcommands_entry = {
             \ "cmd": "ctags-exuberant",
             \ "args": "",
             \ "filesappend": "**"
             \ }
 
-" TODO: CheckCommandList no longer describes the purpose of the function.  
-" Init - might be a better name.
+""
+" Check command options and initialise tag creation.
+"
+" Ensure that tags for the current file do need to be created, validated a set
+" of current command line options, and create tags based on them.
+"
+" @param bool forceCreate A switch indicating if we want to update tags for 
+" the current file only (0), or (re)create tags for all file under the path.
+"
 function! taggatron#CheckCommandList(forceCreate)
-    " Initialise local variables
-    let l:taggatron_enabled = taggatron#get('taggatron_enabled')
-
-    " Ensure taggatron is enabled
-    if l:taggatron_enabled != 1
-        call taggatron#debug("Tag file generation disabled (taggatron_enabled: " . l:taggatron_enabled . ")")
+    " Exit early if taggatron is disabled
+    if taggatron#get('taggatron_enabled') == 0
+        call taggatron#debug('Tag file generation is disabled')
         return
     endif
 
     " Identify current working directory
-    let l:cwd = getcwd()
-    call taggatron#debug("Current directory: ".l:cwd)
+    let l:cwd = fnamemodify(getcwd(), ':p')
+    call taggatron#debug('Current directory: '.l:cwd)
 
-    " Only process files with in current working directory
-    if expand("%:p:h") =~ l:cwd . ".*"
-        call taggatron#debug("Checking for tag command for this file type")
-        let l:cmdset = get(b:tagcommands,&filetype)
-
-        " Log a message if tag command is missing
-        if l:cmdset is 0
-            call taggatron#debug("No tag command for filetype " . &filetype)
-
-        " Create tags since tag command does exists
-        else
-            call taggatron#CreateTags(l:cmdset,a:forceCreate)
-        endif
-
-    " Log a message if current file is outside current working directory
-    else
-        call taggatron#debug("Not creating tags: file is not in current directory")
+    " Do nothing if the file is not inside the current working directory
+    if expand("%:p:h") !~ l:cwd . '.*'
+        call taggatron#debug('Not creating tags: file is not inside current directory')
+        return
     endif
+
+    " Validate command options for the current file type
+    call taggatron#debug('Checking for tag command for this file type')
+    let l:cmdset = get(taggatron#get('tagcommands'), &filetype)
+
+    " Do nothing  if tag command is missing
+    if l:cmdset is 0
+        call taggatron#debug('No tag command for filetype ' . &filetype)
+        return
+    endif
+
+    " Exit with an error if tag file argument is missing
+    if !has_key(l:cmdset, 'tagfile')
+        call taggatron#error('Missing tag file for file type ' . &filetype)
+        return
+    endif
+
+    " Create tag file and ensure that it is in use by the editor
+    call taggatron#CreateTags(l:cmdset,a:forceCreate)
+    call taggatron#SetTags(l:cmdset['tagfile'])
 endfunction
 
-function! taggatron#CreateTags(cmdset,forceCreate)
-    call taggatron#debug("Creating tags for file type ".&filetype)
-    call taggatron#debug(a:cmdset)
-    call taggatron#debug(s:taggatron_cmd_entry)
+""
+" Create tags as per command options
+"
+" This function is used to update tags for the current file via UpdateTags() 
+" or to create a new tag file for tags collected from all files matching 
+" a current/configured language under a specific path.
+"
+" @param dictionary cmdset A set of command options
+"
+function! taggatron#CreateTags(cmdset, forceCreate)
+    call taggatron#debug('Creating tags for file type ' . &filetype)
+    call taggatron#debug(string(a:cmdset))
+    call taggatron#debug(string(s:tagcommands_entry))
 
-    " Define local support variables
-    let l:cset = {}
-    let l:eset = a:cmdset
+    " Initialise local support variables
+    let l:cmdset = {}
     let l:cwd = fnamemodify(getcwd(), ':p')
 
-    " Initialise l:cset variable
-    call extend(l:cset,s:taggatron_cmd_entry)
-    call extend(l:cset,l:eset)
+    " Build up a set of command line options
+    call extend(l:cmdset, s:tagcommands_entry)
+    call extend(l:cmdset, a:cmdset)
 
-    " Detect missing tagfile
-    if !has_key(l:cset,'tagfile')
-        call taggatron#error("Missing tag file destination from tag commands for file type ".&filetype)
+    " Updated tag file and exit early
+    if filereadable(l:cmdset['tagfile']) && a:forceCreate == 0
+        call taggatron#debug('Updating tag file ' . l:cmdset['tagfile'])
+        call taggatron#UpdateTags(l:cmdset['cmd'], l:cwd, l:cmdset['tagfile'])
         return
     endif
 
     " Identify files to be scanned
-    if !has_key(l:cset,'files')
-        let l:cset['files'] = l:cwd
-        if has_key(l:cset,'filesappend')
-            let l:cset['files'] = l:cset['files'].l:cset['filesappend']
+    if !has_key(l:cmdset, 'files')
+        let l:cmdset['files'] = l:cwd
+
+        " Append path suffix on top of the existing 'files' path
+        if has_key(l:cmdset, 'filesappend')
+            let l:cmdset['files'] = l:cmdset['files'] . l:cmdset['filesappend']
         endif
     endif
 
-    " Identify the value for the ctag's --language switch
-    if !has_key(l:cset,"lang")
-        let l:cset['lang'] = &filetype
-    endif
+    " Auto-generate --languages command line argument
+    let l:cmdset['args'] .= ' --languages='
+                \ . (has_key(l:cmdset, 'lang') ? l:cmdset['lang'] : &filetype)
 
-    " Generate ctags command
-    let l:cmdstr = l:cset['cmd'] . " " . l:cset["args"] . " --languages=" . l:cset['lang']
+    " Auto-generate -f command line argument
+    let l:cmdset['args'] .= ' -f ' . l:cmdset['tagfile']
 
-    " Run ctags to either (re)create or update tag file
-    if !filereadable(l:cset['tagfile']) || a:forceCreate == 1
-        let l:cmdstr = l:cmdstr ." -f ".l:cset['tagfile'] . " " .l:cset['files']
-        call taggatron#debug("Executing command: ".l:cmdstr)
-        call system(l:cmdstr)
-    else
-        call taggatron#debug("Updating tag file ".l:cset['tagfile'])
-        call taggatron#UpdateTags(l:cset['cmd'],l:cwd,l:cset['tagfile'])
-    endif
+    " Create a completed command line string from all available arguments
+    let l:cmdstr = l:cmdset['cmd']
+                \ . ' ' . l:cmdset['args']
+                \ . ' ' . l:cmdset['files']
 
-    " Ensure that generated tags are picked up by the editor
-    let l:tagfile = fnamemodify(l:cwd.l:cset['tagfile'], ':p')
-    call taggatron#SetTags(l:tagfile)
+    " Execute tag creation command by passing it over to the system
+    call taggatron#debug('Executing command: ' . l:cmdstr)
+    call system(l:cmdstr)
 endfunction
 
 """"""""""""""""""
