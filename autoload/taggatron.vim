@@ -2,70 +2,117 @@
 if exists("g:loaded_taggatron") || &cp
     finish
 endif
-
 let g:loaded_taggatron= 1
 
-let s:taggatron_cmd_entry = {"cmd":"ctags-exuberant","args":"",'filesappend':'**'}
+" Initialise script default values
+let s:taggatron_enabled = 1
+let s:tagcommands = {}
+let s:tagcommands_entry = {
+            \ "cmd": "ctags-exuberant",
+            \ "args": "",
+            \ "filesappend": "**"
+            \ }
 
-function! taggatron#CreateTags(cmdset,forceCreate)
-    call taggatron#debug("Creating tags for file type ".&filetype)
-    call taggatron#debug(a:cmdset)
-    call taggatron#debug(s:taggatron_cmd_entry)
-
-    " Define local support variables
-    let l:cset = {}
-    let l:eset = a:cmdset
-    let l:cwd = fnamemodify(getcwd(), ':p')
-
-    " Initialise l:cset variable
-    call extend(l:cset,s:taggatron_cmd_entry)
-    call extend(l:cset,l:eset)
-
-    " Detect missing tagfile
-    if !has_key(l:cset,'tagfile')
-        call taggatron#error("Missing tag file destination from tag commands for file type ".&filetype)
+""
+" Check command options and initialise tag creation.
+"
+" Ensure that tags for the current file do need to be created, validate a set
+" of current command line options, and create tags based on them.
+"
+" @param bool forceCreate A switch indicating if we want to update tags for 
+" the current file only (0), or (re)create tags for all file under the path.
+"
+function! taggatron#CheckCommandList(forceCreate)
+    " Exit early if taggatron is disabled
+    if taggatron#get('taggatron_enabled') == 0
+        call taggatron#debug('Tag file generation is disabled')
         return
     endif
 
-    " Identify files to be scanned
-    if !has_key(l:cset,'files')
-        let l:cset['files'] = l:cwd
-        if has_key(l:cset,'filesappend')
-            let l:cset['files'] = l:cset['files'].l:cset['filesappend']
-        endif
+    " Validate command options for the current file type
+    call taggatron#debug('Checking for tag command for this file type')
+    let l:cmdset = get(taggatron#get('tagcommands'), &filetype)
+
+    " Do nothing  if tag command is missing
+    if l:cmdset is 0
+        call taggatron#debug('No tag command for filetype ' . &filetype)
+        return
     endif
 
-    " Identify the value for the ctag's --language switch
-    if !has_key(l:cset,"lang")
-        let l:cset['lang'] = &filetype
+    " Identify project root directory (aka files)
+    let l:cmdset['files'] = has_key(l:cmdset, 'files')
+                \ ? fnamemodify(l:cmdset['files'], ':p')
+                \ : fnamemodify(getcwd(), ':p')
+    call taggatron#debug('Project root directory: ' . l:cmdset['files'])
+
+    " Do nothing if the file is not inside the project directory
+    if expand("%:p") !~ '^' . l:cmdset['files']
+        call taggatron#debug('Not creating tags: file is not inside project root')
+        return
     endif
 
-    " Generate ctags command
-    let l:cmdstr = l:cset['cmd'] . " " . l:cset["args"] . " --languages=" . l:cset['lang']
-
-    " Run ctags to either (re)create or update tag file
-    if !filereadable(l:cset['tagfile']) || a:forceCreate == 1
-        let l:cmdstr = l:cmdstr ." -f ".l:cset['tagfile'] . " " .l:cset['files']
-        call taggatron#debug("Executing command: ".l:cmdstr)
-        call system(l:cmdstr)
-    else
-        call taggatron#debug("Updating tag file ".l:cset['tagfile'])
-        call taggatron#UpdateTags(l:cset['cmd'],l:cwd,l:cset['tagfile'])
+    " Exit with an error if tag file argument is missing
+    if !has_key(l:cmdset, 'tagfile')
+        call taggatron#error('Missing tag file for file type ' . &filetype)
+        return
     endif
 
-    " Ensure that generated tags are picked up by the editor
-    let l:tagfile = fnamemodify(l:cwd.l:cset['tagfile'], ':p')
-    call taggatron#SetTags(l:tagfile)
+    " Sanitize tagfile path
+    let l:cmdset['tagfile'] = fnamemodify(l:cmdset['tagfile'], ':p')
+
+    " Create tag file and ensure that it is in use by the editor
+    call taggatron#CreateTags(l:cmdset, a:forceCreate)
+    call taggatron#SetTags(l:cmdset['tagfile'])
 endfunction
 
-function! taggatron#error(str)
-    echohl Error | echo a:str | echohl None
-endfunction
+""
+" Create tags as per command options
+"
+" This function is used to update tags for the current file via UpdateTags() 
+" or to create a new tag file for tags collected from all files matching 
+" a current/configured language under a specific path.
+"
+" @param dictionary cmdset A set of command options
+"
+function! taggatron#CreateTags(cmdset, forceCreate)
+    call taggatron#debug('Creating tags for file type ' . &filetype)
+    call taggatron#debug('Argument: ' . string(a:cmdset))
+    call taggatron#debug('Default: ' . string(s:tagcommands_entry))
 
-function! taggatron#debug(str)
-    if g:taggatron_verbose == 1
-        echo a:str
+    " Initialise local support variables
+    let l:cmdset = {}
+
+    " Build up a set of command line options
+    call extend(l:cmdset, s:tagcommands_entry)
+    call extend(l:cmdset, a:cmdset)
+
+    " Updated tag file and exit early
+    if filereadable(l:cmdset['tagfile']) && a:forceCreate == 0
+        call taggatron#debug('Updating tag file ' . l:cmdset['tagfile'])
+        call taggatron#UpdateTags(l:cmdset['cmd'], l:cmdset['files'], l:cmdset['tagfile'])
+        return
     endif
+
+    " Append path suffix on top of the existing 'files' path
+    if has_key(l:cmdset, 'filesappend')
+        let l:cmdset['files'] = l:cmdset['files'] . l:cmdset['filesappend']
+    endif
+
+    " Auto-generate --languages command line argument
+    let l:cmdset['args'] .= ' --languages='
+                \ . (has_key(l:cmdset, 'lang') ? l:cmdset['lang'] : &filetype)
+
+    " Auto-generate -f command line argument
+    let l:cmdset['args'] .= ' -f ' . l:cmdset['tagfile']
+
+    " Create a completed command line string from all available arguments
+    let l:cmdstr = l:cmdset['cmd']
+                \ . ' ' . l:cmdset['args']
+                \ . ' ' . l:cmdset['files']
+
+    " Execute tag creation command by passing it over to the system
+    call taggatron#debug('Executing command: ' . l:cmdstr)
+    call system(l:cmdstr)
 endfunction
 
 """"""""""""""""""
