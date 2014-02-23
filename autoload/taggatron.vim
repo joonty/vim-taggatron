@@ -4,15 +4,6 @@ if exists("g:loaded_taggatron") || &cp
 endif
 let g:loaded_taggatron= 1
 
-" Initialise script default values
-let s:taggatron_enabled = 1
-let s:tagcommands = {}
-let s:tagcommands_entry = {
-            \ "cmd": "ctags-exuberant",
-            \ "args": "",
-            \ "filesappend": "**"
-            \ }
-
 ""
 " Check command options and initialise tag creation.
 "
@@ -77,13 +68,13 @@ endfunction
 function! taggatron#CreateTags(cmdset, forceCreate)
     call taggatron#debug('Creating tags for file type ' . &filetype)
     call taggatron#debug('Argument: ' . string(a:cmdset))
-    call taggatron#debug('Default: ' . string(s:tagcommands_entry))
+    call taggatron#debug('Default: ' . string(taggatron#get('tagcommand_defaults')))
 
     " Initialise local support variables
     let l:cmdset = {}
 
     " Build up a set of command line options
-    call extend(l:cmdset, s:tagcommands_entry)
+    call extend(l:cmdset, taggatron#get('tagcommand_defaults'))
     call extend(l:cmdset, a:cmdset)
 
     " Updated tag file and exit early

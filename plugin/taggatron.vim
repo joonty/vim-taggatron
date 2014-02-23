@@ -1,6 +1,13 @@
 " Initialise script default values
+let s:taggatron_enabled = 1
 let s:taggatron_verbose = 0
 let s:tagdefaults = ''
+let s:tagcommands = {}
+let s:tagcommand_defaults = {
+            \ "cmd": "ctags-exuberant",
+            \ "args": "",
+            \ "filesappend": "**"
+            \ }
 
 " Function Declarations
 " =====================
@@ -74,8 +81,8 @@ endfunction
 "
 function! taggatron#get(option, ...)
     for l:scope in ['b', 'g', 'l', 's']
-        if exists(l:scope . ':'. a:option)
-            return eval(l:scope . ':'. a:option)
+        if exists(l:scope . ':' . a:option)
+            return eval(l:scope . ':' . a:option)
         endif
     endfor
 
@@ -119,7 +126,7 @@ endfunction
 " ===============
 
 " Initialise taggatron auto-commands
-autocmd! BufNew,BufRead * call taggatron#SetTags(taggatron#get('tagdefaults', []))
+autocmd! BufNew,BufRead * call taggatron#SetTags(taggatron#get('tagdefaults'))
 autocmd! BufWritePost * call taggatron#CheckCommandList(0)
 
 " Initialise taggatron commands
