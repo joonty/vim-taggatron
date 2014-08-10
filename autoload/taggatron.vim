@@ -30,6 +30,14 @@ function! taggatron#CheckCommandList(forceCreate)
         return
     endif
 
+    " Check for multiple command definitions
+    if taggatron#get('taggatron_multicommands') == 0
+        let l:cmdsets = { 'default': l:cmdsets }
+        call taggatron#debug('Single command')
+    else
+        call taggatron#debug('Multiple commands')
+    endif
+
     " allow multiple commands for ctags
     for [ l:cmdname, l:cmdset ] in items(l:cmdsets)
         " Identify project root directory (aka files)
