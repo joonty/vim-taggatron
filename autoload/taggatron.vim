@@ -44,6 +44,7 @@ function! taggatron#CheckCommandList(forceCreate)
         let l:cmdset['files'] = has_key(l:cmdset, 'files')
                     \ ? fnamemodify(l:cmdset['files'], ':p')
                     \ : fnamemodify(getcwd(), ':p')
+        let l:cmdset['files'] = resolve(expand(l:cmdset['files']))
         call taggatron#debug('Project root directory: ' . l:cmdset['files'])
 
         " Do nothing if the file is not inside the project directory
