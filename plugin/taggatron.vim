@@ -1,6 +1,7 @@
 " Initialise script default values
 let s:taggatron_enabled = 1
 let s:taggatron_verbose = 0
+let s:taggatron_multicommands = 0
 let s:tagdefaults = ''
 let s:tagcommands = {}
 let s:tagcommand_defaults = {

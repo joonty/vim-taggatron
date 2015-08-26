@@ -22,38 +22,54 @@ function! taggatron#CheckCommandList(forceCreate)
 
     " Validate command options for the current file type
     call taggatron#debug('Checking for tag command for this file type')
-    let l:cmdset = get(taggatron#get('tagcommands'), &filetype)
+    let l:cmdsets = get(taggatron#get('tagcommands'), &filetype)
 
     " Do nothing  if tag command is missing
-    if l:cmdset is 0
+    if l:cmdsets is 0
         call taggatron#debug('No tag command for filetype ' . &filetype)
         return
     endif
 
-    " Identify project root directory (aka files)
-    let l:cmdset['files'] = has_key(l:cmdset, 'files')
-                \ ? fnamemodify(l:cmdset['files'], ':p')
-                \ : fnamemodify(getcwd(), ':p')
-    call taggatron#debug('Project root directory: ' . l:cmdset['files'])
-
-    " Do nothing if the file is not inside the project directory
-    if expand("%:p") !~ '^' . l:cmdset['files']
-        call taggatron#debug('Not creating tags: file is not inside project root')
-        return
+    " Check for multiple command definitions
+    if taggatron#get('taggatron_multicommands') == 0
+        let l:cmdsets = { 'default': l:cmdsets }
+        call taggatron#debug('Single command')
+    else
+        call taggatron#debug('Multiple commands')
     endif
 
-    " Exit with an error if tag file argument is missing
-    if !has_key(l:cmdset, 'tagfile')
-        call taggatron#error('Missing tag file for file type ' . &filetype)
+    " allow multiple commands for ctags
+    for [ l:cmdname, l:cmdset ] in items(l:cmdsets)
+        " Identify project root directory (aka files)
+        let l:cmdset['files'] = has_key(l:cmdset, 'files')
+                    \ ? fnamemodify(l:cmdset['files'], ':p')
+                    \ : fnamemodify(getcwd(), ':p')
+        let l:cmdset['files'] = resolve(expand(l:cmdset['files']))
+        call taggatron#debug('Project root directory: ' . l:cmdset['files'])
+
+        " Do nothing if the file is not inside the project directory
+        if expand("%:p") !~ '^' . l:cmdset['files']
+            call taggatron#debug('Not creating tags: file is not inside project root')
+            " Try to find the next rule for the same file type
+            continue
+        endif
+
+        " Exit with an error if tag file argument is missing
+        if !has_key(l:cmdset, 'tagfile')
+            call taggatron#error('Missing tag file for file type ' . &filetype)
+            return
+        endif
+
+        " Sanitize tagfile path
+        let l:cmdset['tagfile'] = fnamemodify(l:cmdset['tagfile'], ':p')
+
+        " Create tag file and ensure that it is in use by the editor
+        call taggatron#CreateTags(l:cmdset, a:forceCreate)
+        call taggatron#SetTags(l:cmdset['tagfile'])
+
+        " If tag file created, stop searching for other rules
         return
-    endif
-
-    " Sanitize tagfile path
-    let l:cmdset['tagfile'] = fnamemodify(l:cmdset['tagfile'], ':p')
-
-    " Create tag file and ensure that it is in use by the editor
-    call taggatron#CreateTags(l:cmdset, a:forceCreate)
-    call taggatron#SetTags(l:cmdset['tagfile'])
+    endfor
 endfunction
 
 ""
@@ -340,7 +356,7 @@ function! AutoTagDebug()
    setlocal buftype=nowrite
    setlocal bufhidden=delete
    setlocal noswapfile
-   normal 
+   normal
 endfunction
 
 endif " has("python")
